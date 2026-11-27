@@ -22,7 +22,14 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include "global.h"
+#include "scheduler.h"
+#include "software_timer.h"
+#include "button.h"
+#include "traffic_light.h"
+#include "lcd.h"
+#include "dht20.h"
+#include "fsm_main.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -57,7 +64,10 @@ static void MX_USART2_UART_Init(void);
 static void MX_I2C1_Init(void);
 static void MX_TIM2_Init(void);
 /* USER CODE BEGIN PFP */
-
+static void heartbeat_task(void);
+/* >>> TEST TAM THOI - XOA SAU KHI TEST XONG (1/2) <<< */
+void hw_test_run(void);      /* dinh nghia trong hw_test.c */
+/* >>> HET PHAN TEST (1/2) <<< */
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -97,7 +107,27 @@ int main(void)
   MX_I2C1_Init();
   MX_TIM2_Init();
   /* USER CODE BEGIN 2 */
+  /* >>> TEST TAM THOI - XOA SAU KHI TEST XONG (2/2) <<<
+   * Chon bai test bang #define HW_TEST trong hw_test.c:
+   *   1 = mau den | 2 = nut nhan | 3 = I2C scan | 4 = LCD
+   * Muon chay chuong trinh chinh: XOA hoac comment dong duoi. */
+  hw_test_run();
+  /* >>> HET PHAN TEST (2/2) <<< */
 
+  global_init();
+  traffic_init();
+  button_init();
+  lcd_init();
+  dht20_init();
+  fsm_main_init();
+
+  SCH_Init();
+  SCH_Add_Task(timer_run,       0, 1);                  /* 10 ms  */
+  SCH_Add_Task(button_scan,     0, 1);                  /* 10 ms  */
+  SCH_Add_Task(fsm_main_run,    1, FSM_PERIOD_TICKS);   /* 50 ms  */
+  SCH_Add_Task(dht20_task,     50, 200);                /* 2 s    */
+  SCH_Add_Task(heartbeat_task,  0, 50);                 /* 500 ms */
+  HAL_TIM_Base_Start_IT(&htim2);
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -107,6 +137,7 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
+    SCH_Dispatch_Tasks();
   }
   /* USER CODE END 3 */
 }
@@ -336,7 +367,15 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
+{
+  if (htim->Instance == TIM2) SCH_Update();
+}
 
+static void heartbeat_task(void)
+{
+  HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
+}
 /* USER CODE END 4 */
 
 /**
